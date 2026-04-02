@@ -189,43 +189,52 @@ async function selectVersionAndInstall(context: vscode.ExtensionContext) {
         isMach: false /* We can't tell if a version is Mach while being offline */,
     }));
 
-    try {
-        const onlineVersions = await getVersions(context);
-        outer: for (const onlineVersion of onlineVersions) {
-            for (const version of versions) {
-                if (semver.eq(version.version, onlineVersion.version)) {
-                    version.name ??= onlineVersion.name;
-                    version.online = true;
-                    version.isMach = onlineVersion.isMach;
+    await vscode.window.withProgress(
+        {
+            location: vscode.ProgressLocation.Notification,
+            title: "Fetching available Zig versions...",
+            cancellable: false,
+        },
+        async () => {
+            try {
+                const onlineVersions = await getVersions(context);
+                outer: for (const onlineVersion of onlineVersions) {
+                    for (const version of versions) {
+                        if (semver.eq(version.version, onlineVersion.version)) {
+                            version.name ??= onlineVersion.name;
+                            version.online = true;
+                            version.isMach = onlineVersion.isMach;
+                        }
+                    }
+
+                    for (const version of versions) {
+                        if (semver.eq(version.version, onlineVersion.version) && version.name === onlineVersion.name) {
+                            continue outer;
+                        }
+                    }
+
+                    versions.push({
+                        name: onlineVersion.name,
+                        version: onlineVersion.version,
+                        online: true,
+                        offline: !!offlineVersions.find((item) => semver.eq(item.version, onlineVersion.version)),
+                        isMach: onlineVersion.isMach,
+                    });
+                }
+            } catch (err) {
+                if (!offlineVersions.length) {
+                    if (err instanceof Error) {
+                        void vscode.window.showErrorMessage(`Failed to query available Zig version: ${err.message}`);
+                    } else {
+                        void vscode.window.showErrorMessage(`Failed to query available Zig version!`);
+                    }
+                    return;
+                } else {
+                    // Only show the locally installed versions
                 }
             }
-
-            for (const version of versions) {
-                if (semver.eq(version.version, onlineVersion.version) && version.name === onlineVersion.name) {
-                    continue outer;
-                }
-            }
-
-            versions.push({
-                name: onlineVersion.name,
-                version: onlineVersion.version,
-                online: true,
-                offline: !!offlineVersions.find((item) => semver.eq(item.version, onlineVersion.version)),
-                isMach: onlineVersion.isMach,
-            });
-        }
-    } catch (err) {
-        if (!offlineVersions.length) {
-            if (err instanceof Error) {
-                void vscode.window.showErrorMessage(`Failed to query available Zig version: ${err.message}`);
-            } else {
-                void vscode.window.showErrorMessage(`Failed to query available Zig version!`);
-            }
-            return;
-        } else {
-            // Only show the locally installed versions
-        }
-    }
+        },
+    );
 
     sortVersions(versions);
     const placeholderVersion = versions.find((item) => item.version.prerelease.length === 0)?.version;
