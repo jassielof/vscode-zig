@@ -151,11 +151,15 @@
           "match": "\\b(if|else|switch|orelse)\\b"
         },
         {
-          "name": "keyword.constant.default.zig",
-          "match": "\\b(null|undefined)\\b"
+          "name": "constant.language.null.zig",
+          "match": "\\bnull\\b"
         },
         {
-          "name": "keyword.constant.bool.zig",
+          "name": "constant.language.undefined.zig",
+          "match": "\\bundefined\\b"
+        },
+        {
+          "name": "constant.language.boolean.zig",
           "match": "\\b(true|false)\\b"
         },
         {
