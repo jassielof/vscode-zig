@@ -217,30 +217,12 @@
         {
           "name": "comment.line.documentation.zig",
           "begin": "//[!/](?=[^/])",
-          "end": "$",
-          "patterns": [
-            {
-              "include": "#commentContents"
-            }
-          ]
+          "end": "$"
         },
         {
           "name": "comment.line.double-slash.zig",
           "begin": "//",
-          "end": "$",
-          "patterns": [
-            {
-              "include": "#commentContents"
-            }
-          ]
-        }
-      ]
-    },
-    "commentContents": {
-      "patterns": [
-        {
-          "match": "\\b(TODO|FIXME|XXX|NOTE)\\b:?",
-          "name": "keyword.todo.zig"
+          "end": "$"
         }
       ]
     },
