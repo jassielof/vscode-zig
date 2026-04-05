@@ -135,6 +135,20 @@
           "match": "\\b(asm|unreachable)\\b"
         },
         {
+          "match": "\\b(break|continue)\\s*:\\s*([a-zA-Z_]\\w*|@\\\".+\\\")\\b|\\b(?!\\d)([a-zA-Z_]\\w*|@\\\".+\\\")\\b(?=\\s*:\\s*(?:\\{|while\\b))",
+          "captures": {
+            "1": {
+              "name": "keyword.control.flow.zig"
+            },
+            "2": {
+              "name": "entity.name.label.zig"
+            },
+            "3": {
+              "name": "entity.name.label.zig"
+            }
+          }
+        },
+        {
           "name": "keyword.control.flow.zig",
           "match": "\\b(break|return|continue|defer|errdefer)\\b"
         },
