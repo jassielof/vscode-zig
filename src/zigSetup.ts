@@ -9,6 +9,7 @@ import * as minisign from "./minisign";
 import * as versionManager from "./versionManager";
 import * as zigUtil from "./zigUtil";
 import { ZigProvider } from "./zigProvider";
+import { snakeCase } from "lodash-es";
 
 let statusItem: vscode.StatusBarItem;
 let languageStatusItem: vscode.LanguageStatusItem;
@@ -535,22 +536,37 @@ function updateLanguageStatusItem(item: vscode.LanguageStatusItem, version: semv
     };
 }
 
-function updateZigPathEnvironmentVariableCollection(context: vscode.ExtensionContext, zigExePath: string | null) {
-    if (zigExePath) {
-        const envValue = path.dirname(zigExePath) + path.delimiter;
+function updateEnvironmentVariableCollection(context: vscode.ExtensionContext) {
+    const zigPath = zigProvider.getZigPath();
+    if (zigPath) {
+        const envValue = path.dirname(zigPath) + path.delimiter;
         // This will take priority over a user-defined PATH values.
         context.environmentVariableCollection.prepend("PATH", envValue);
     } else {
         context.environmentVariableCollection.delete("PATH");
     }
-}
 
-function updateZigLibPathEnvironmentVariableCollection(context: vscode.ExtensionContext) {
-    const zigLibPath = vscode.workspace.getConfiguration("zig").get<string>("libPath");
+    const configuration = vscode.workspace.getConfiguration("zig");
+
+    const zigLibPath = configuration.get<string>("libPath");
     if (zigLibPath) {
         context.environmentVariableCollection.replace("ZIG_LIB_DIR", zigLibPath);
     } else {
         context.environmentVariableCollection.delete("ZIG_LIB_DIR");
+    }
+
+    const errorStyle = configuration.get<string>("buildErrorStyle");
+    if (errorStyle && errorStyle !== "verbose") {
+        context.environmentVariableCollection.replace("ZIG_BUILD_ERROR_STYLE", snakeCase(errorStyle));
+    } else {
+        context.environmentVariableCollection.delete("ZIG_BUILD_ERROR_STYLE");
+    }
+
+    const multilineErrors = configuration.get<string>("buildMultilineErrors");
+    if (multilineErrors && multilineErrors !== "indent") {
+        context.environmentVariableCollection.replace("ZIG_BUILD_MULTILINE_ERRORS", snakeCase(multilineErrors));
+    } else {
+        context.environmentVariableCollection.delete("ZIG_BUILD_MULTILINE_ERRORS");
     }
 }
 
@@ -565,8 +581,7 @@ async function updateStatus(context: vscode.ExtensionContext): Promise<void> {
 
     updateStatusItem(statusItem, zigVersion);
     updateLanguageStatusItem(languageStatusItem, zigVersion);
-    updateZigPathEnvironmentVariableCollection(context, zigPath);
-    updateZigLibPathEnvironmentVariableCollection(context);
+    updateEnvironmentVariableCollection(context);
 
     // Try to check whether the Zig version satifies the `minimum_zig_version` in `build.zig.zon`
 
@@ -810,8 +825,12 @@ export async function setupZig(context: vscode.ExtensionContext) {
                 }
                 void refreshZigInstallation();
             }
-            if (change.affectsConfiguration("zig.libPath")) {
-                updateZigLibPathEnvironmentVariableCollection(context);
+            if (
+                change.affectsConfiguration("zig.libPath") ||
+                change.affectsConfiguration("zig.buildErrorStyle") ||
+                change.affectsConfiguration("zig.buildMultilineErrors")
+            ) {
+                updateEnvironmentVariableCollection(context);
             }
         }),
         vscode.window.onDidChangeActiveTextEditor(onDidChangeActiveTextEditor),

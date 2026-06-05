@@ -117,7 +117,7 @@
             "Extension",
             "ZLS language server"
           ],
-          "enumDescriptions": [
+          "markdownEnumDescriptions": [
             "Disable formatting",
             "Provide formatting by directly invoking `zig fmt`",
             "Provide formatting by using ZLS (which matches `zig fmt`)"
@@ -174,7 +174,7 @@
             "Extension",
             "ZLS language server"
           ],
-          "enumDescriptions": [
+          "markdownEnumDescriptions": [
             "Disable build on save",
             "Disabled unless ZLS has enabled [build on save](https://zigtools.org/zls/guides/build-on-save/) automatically.",
             "Provide build on save by running `zig build --watch`",
@@ -189,6 +189,38 @@
           },
           "default": [],
           "description": "Specify which additional arguments should be passed to `zig build` when running build on save. Use the `--build-file` argument to override which build file should be used."
+        },
+        "zig.buildErrorStyle": {
+          "type": "string",
+          "description": "Control how build errors are printed. Only applies to the `zig build subcommand`.",
+          "enum": [
+            "verbose",
+            "minimal",
+            "verboseClear",
+            "minimalClear"
+          ],
+          "markdownEnumDescriptions": [
+            "Report errors with full context.",
+            "Report errors after summary, excluding context like command lines.",
+            "Like 'verbose', but clear the terminal at the start of each update.",
+            "Like 'minimal', but clear the terminal at the start of each update."
+          ],
+          "default": "verbose"
+        },
+        "zig.buildMultilineErrors": {
+          "type": "string",
+          "description": "Control how multi-line error messages are printed. Only applies to the `zig build subcommand`.",
+          "enum": [
+            "indent",
+            "newline",
+            "none"
+          ],
+          "markdownEnumDescriptions": [
+            "Indent non-initial lines to align with initial line.",
+            "Include a leading newline so that the error message is on its own lines.",
+            "Print as usual so the first line is misaligned."
+          ],
+          "default": "indent"
         },
         "zig.zls.trace.server": {
           "scope": "window",
