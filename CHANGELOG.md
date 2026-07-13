@@ -1,3 +1,14 @@
+## 0.6.19
+- Add UI notifications for version retrieval behavior (@Verafahn)
+- Replace instead of appending `ZIG_LIB_DIR` environment variable (@Techatrix)
+- Add settings to configure build error style environment variables (@Techatrix)
+- Syntax highlighting changes:
+    - Add addrspace keyword (@FnControlOption)
+    - Use constant scope for Primitive Values (@Jan200101)
+    - Remove TODO highlighting (@Jan200101)
+    - Add support for labels (@Jan200101)
+    - Do not highlight capitalized functions as types
+
 ## 0.6.18
 - Add `zig-pkg` directory to `explorer.autoRevealExclude` (@Techatrix)
 - Verify minisign trusted comment against requested filename (@Techatrix)
