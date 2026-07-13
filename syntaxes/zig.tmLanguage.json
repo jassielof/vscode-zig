@@ -135,7 +135,7 @@
           "match": "\\b(asm|unreachable)\\b"
         },
         {
-          "match": "\\b(break|continue)\\s*:\\s*([a-zA-Z_]\\w*|@\\\".+\\\")\\b|\\b(?!\\d)([a-zA-Z_]\\w*|@\\\".+\\\")\\b(?=\\s*:\\s*(?:\\{|while\\b))",
+          "match": "\\b(break|continue)\\s*:\\s*([a-zA-Z_]\\w*|@\\\".*\\\")|(\\b[a-zA-Z_]\\w*|@\\\".*\\\")(?=\\s*:\\s*(?:\\{|while\\b|for\\b|switch\\b))",
           "captures": {
             "1": {
               "name": "keyword.control.flow.zig"
