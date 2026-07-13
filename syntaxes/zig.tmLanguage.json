@@ -36,17 +36,6 @@
           "name": "meta.function.declaration.zig",
           "patterns": [
             {
-              "match": "\\b(fn)\\s+([A-Z][a-zA-Z0-9]*)\\b",
-              "captures": {
-                "1": {
-                  "name": "storage.type.function.zig"
-                },
-                "2": {
-                  "name": "entity.name.type.zig"
-                }
-              }
-            },
-            {
               "match": "\\b(fn)\\s+([_a-zA-Z][_a-zA-Z0-9]*)\\b",
               "captures": {
                 "1": {
@@ -81,10 +70,6 @@
         {
           "name": "meta.function.call.zig",
           "patterns": [
-            {
-              "match": "([A-Z][a-zA-Z0-9]*)(?=\\s*\\()",
-              "name": "entity.name.type.zig"
-            },
             {
               "match": "([_a-zA-Z][_a-zA-Z0-9]*)(?=\\s*\\()",
               "name": "entity.name.function.zig"
@@ -182,7 +167,21 @@
         },
         {
           "name": "keyword.type.zig",
-          "match": "\\b(bool|void|noreturn|type|error|anyerror|anyframe|anytype|anyopaque)\\b"
+          "match": "\\b(bool|void|noreturn|type|anyerror|anyframe|anytype|anyopaque)\\b"
+        },
+        {
+          "match": "\\b(error)(?:(\\.)(\\w+))?\\b",
+          "captures": {
+            "1": {
+              "name": "keyword.type.zig"
+            },
+            "2": {
+              "name": "punctuation.accessor.zig"
+            },
+            "3": {
+              "name": "entity.name.error.zig"
+            }
+          }
         },
         {
           "name": "keyword.type.integer.zig",
