@@ -399,6 +399,12 @@
         "category": "Zig"
       },
       {
+        "command": "zig.insertLineBreakWithoutContinuation",
+        "title": "Insert Line Break Without Continuation",
+        "category": "Zig",
+        "description": "Insert a new line without continuing a doc comment (`///`, `//!`) or multiline string literal"
+      },
+      {
         "command": "zig.zls.enable",
         "title": "Enable Language Server",
         "category": "ZLS language server"
@@ -419,6 +425,11 @@
         "command": "zig.toggleMultilineStringLiteral",
         "key": "alt+m alt+s",
         "when": "editorTextFocus && editorLangId == 'zig'"
+      },
+      {
+        "command": "zig.insertLineBreakWithoutContinuation",
+        "key": "shift+enter",
+        "when": "editorTextFocus && !editorReadonly && editorLangId == 'zig'"
       }
     ],
     "jsonValidation": [
