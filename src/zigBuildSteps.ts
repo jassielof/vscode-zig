@@ -5,8 +5,8 @@ import fs from "node:fs";
 import path from "node:path";
 import util from "node:util";
 
-import { zigProvider } from "./zigSetup";
 import { getWorkspaceFolder } from "./zigUtil";
+import { zigProvider } from "./zigSetup";
 
 const execFile = util.promisify(childProcess.execFile);
 
@@ -14,6 +14,10 @@ interface ZigBuildStep {
     name: string;
     description: string;
     isDefault: boolean;
+}
+
+interface ZigBuildStepQuickPickItem extends vscode.QuickPickItem {
+    step: ZigBuildStep;
 }
 
 export function registerBuildStepsCommand(context: vscode.ExtensionContext): void {
@@ -27,33 +31,47 @@ async function runBuildStep() {
     const workspaceFolder = await pickWorkspaceFolder();
     if (!workspaceFolder) return;
 
+    const quickPick = vscode.window.createQuickPick<ZigBuildStepQuickPickItem>();
+    quickPick.placeholder = "Loading steps...";
+    quickPick.matchOnDescription = true;
+    quickPick.matchOnDetail = true;
+    quickPick.busy = true;
+    quickPick.show();
+
     let steps: ZigBuildStep[];
     try {
         steps = await getBuildSteps(zigPath, workspaceFolder.uri.fsPath);
     } catch (e) {
+        quickPick.dispose();
         const message = e instanceof Error ? e.message : "Failed to run 'zig build --list-steps'.";
         void vscode.window.showErrorMessage(message);
         return;
     }
 
     if (steps.length === 0) {
+        quickPick.dispose();
         void vscode.window.showInformationMessage("No Zig build steps were found.");
         return;
     }
 
-    const pick = await vscode.window.showQuickPick(
-        steps.map((step) => ({
-            label: step.isDefault ? `$(star-full) ${step.name}` : step.name,
-            description: step.isDefault ? "default" : undefined,
-            detail: step.description || undefined,
-            step,
-        })),
-        {
-            placeHolder: "Select a Zig build step to run",
-            matchOnDescription: true,
-            matchOnDetail: true,
-        },
-    );
+    quickPick.items = steps.map((step) => ({
+        label: step.isDefault ? `$(star-full) ${step.name}` : step.name,
+        description: step.isDefault ? "default" : undefined,
+        detail: step.description || undefined,
+        step,
+    }));
+    quickPick.placeholder = "Select a Zig build step to run";
+    quickPick.busy = false;
+
+    const pick = await new Promise<ZigBuildStepQuickPickItem | undefined>((resolve) => {
+        quickPick.onDidAccept(() => {
+            resolve(quickPick.selectedItems[0] as ZigBuildStepQuickPickItem | undefined);
+        });
+        quickPick.onDidHide(() => {
+            resolve(undefined);
+        });
+    });
+    quickPick.dispose();
     if (!pick) return;
 
     const task = new vscode.Task(
