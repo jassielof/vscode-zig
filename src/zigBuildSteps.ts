@@ -5,8 +5,8 @@ import fs from "node:fs";
 import path from "node:path";
 import util from "node:util";
 
-import { getWorkspaceFolder } from "./zigUtil";
 import { zigProvider } from "./zigSetup";
+import { getWorkspaceFolder } from "./zigUtil";
 
 const execFile = util.promisify(childProcess.execFile);
 
@@ -114,19 +114,35 @@ function hasBuildFile(folder: vscode.WorkspaceFolder): boolean {
 async function getBuildSteps(zigPath: string, cwd: string): Promise<ZigBuildStep[]> {
     const { stdout } = await execFile(zigPath, ["build", "--list-steps"], { cwd });
 
-    // e.g. "  install (default)            Copy build artifacts to prefix path"
-    const stepLineRegex = /^\s*(\S+)(\s+\(default\))?(?:\s{2,})?(.*)$/;
-
     const steps: ZigBuildStep[] = [];
     for (const line of stdout.split("\n")) {
         if (!line.trim()) continue;
-        const match = stepLineRegex.exec(line);
-        if (!match) continue;
-        steps.push({
-            name: match[1],
-            isDefault: !!match[2],
-            description: match[3].trim(),
-        });
+        steps.push(parseStepLine(line));
     }
+
+    // The default step should be the first pick
+    steps.sort((a, b) => Number(b.isDefault) - Number(a.isDefault));
     return steps;
+}
+
+/**
+ * Parses a line of `zig build --list-steps` output, e.g.:
+ * - `  install (default)            Copy build artifacts to prefix path`
+ * - `  spaced step (default)        Spaced step description`
+ * - `  check`                       (empty description)
+ *
+ * Step names may contain single spaces (invoked as `zig build "spaced step"`), so the name/description boundary is taken to be the first run of 2+ spaces instead of any whitespace.
+ */
+function parseStepLine(line: string): ZigBuildStep {
+    const trimmed = line.replace(/^\s+/, "");
+    const columnGap = /\s{2,}/.exec(trimmed);
+    const namePart = columnGap ? trimmed.slice(0, columnGap.index) : trimmed;
+    const description = columnGap ? trimmed.slice(columnGap.index + columnGap[0].length).trim() : "";
+
+    const defaultMatch = /^(.*?)\s+\(default\)$/.exec(namePart);
+    return {
+        name: (defaultMatch ? defaultMatch[1] : namePart).trim(),
+        description,
+        isDefault: !!defaultMatch,
+    };
 }
