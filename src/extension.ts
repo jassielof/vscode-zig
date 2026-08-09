@@ -4,6 +4,7 @@ import { activate as activateZls, deactivate as deactivateZls } from "./zls";
 import ZigMainCodeLensProvider from "./zigMainCodeLens";
 import ZigTestRunnerProvider from "./zigTestRunnerProvider";
 import { registerBuildOnSaveProvider } from "./zigBuildOnSaveProvider";
+import { registerBuildStepsCommand } from "./zigBuildSteps";
 import { registerDiagnosticsProvider } from "./zigDiagnosticsProvider";
 import { registerDocumentFormatting } from "./zigFormat";
 import { registerTerminalStateManagement } from "./terminalState";
@@ -20,6 +21,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
         registerTerminalStateManagement();
         ZigMainCodeLensProvider.registerCommands(context);
+        registerBuildStepsCommand(context);
         context.subscriptions.push(
             vscode.languages.registerCodeLensProvider(
                 { language: "zig", scheme: "file" },

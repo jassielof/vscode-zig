@@ -389,6 +389,12 @@
         "description": "Debug the current Zig project / file"
       },
       {
+        "command": "zig.buildStep",
+        "title": "Run Build Step...",
+        "category": "Zig",
+        "description": "Pick a step from `zig build --list-steps` and run `zig build <step>`"
+      },
+      {
         "command": "zig.install",
         "title": "Install Zig",
         "category": "Zig Setup"
