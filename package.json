@@ -460,7 +460,7 @@
     "@vscode/vsce": "^3.9.2",
     "esbuild": "^0.25.0",
     "eslint": "^9.0.0",
-    "eslint-config-prettier": "^9.1.0",
+    "eslint-config-prettier": "^10.1.8",
     "prettier": "3.2.5",
     "typescript": "^5.4.3",
     "typescript-eslint": "^8.0.0"
