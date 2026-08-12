@@ -389,6 +389,12 @@
         "description": "Debug the current Zig project / file"
       },
       {
+        "command": "zig.createProject",
+        "title": "Create Project",
+        "category": "Zig",
+        "description": "Create a Zig build project from the default or minimal template"
+      },
+      {
         "command": "zig.install",
         "title": "Install Zig",
         "category": "Zig Setup"
