@@ -38,6 +38,15 @@ async function runBuildStep() {
     quickPick.matchOnDescription = true;
     quickPick.matchOnDetail = true;
     quickPick.busy = true;
+
+    const pickPromise = new Promise<ZigBuildStepQuickPickItem | undefined>((resolve) => {
+        quickPick.onDidAccept(() => {
+            resolve(quickPick.selectedItems[0] as ZigBuildStepQuickPickItem | undefined);
+        });
+        quickPick.onDidHide(() => {
+            resolve(undefined);
+        });
+    });
     quickPick.show();
 
     let steps: ZigBuildStep[];
@@ -65,14 +74,7 @@ async function runBuildStep() {
     quickPick.placeholder = "Select a Zig build step to run";
     quickPick.busy = false;
 
-    const pick = await new Promise<ZigBuildStepQuickPickItem | undefined>((resolve) => {
-        quickPick.onDidAccept(() => {
-            resolve(quickPick.selectedItems[0] as ZigBuildStepQuickPickItem | undefined);
-        });
-        quickPick.onDidHide(() => {
-            resolve(undefined);
-        });
-    });
+    const pick = await pickPromise;
     quickPick.dispose();
     if (!pick) return;
 
