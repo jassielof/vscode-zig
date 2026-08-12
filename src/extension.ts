@@ -3,6 +3,7 @@ import vscode from "vscode";
 import { activate as activateZls, deactivate as deactivateZls } from "./zls";
 import ZigMainCodeLensProvider from "./zigMainCodeLens";
 import ZigTestRunnerProvider from "./zigTestRunnerProvider";
+import { createZigProject } from "./zigProject";
 import { registerBuildOnSaveProvider } from "./zigBuildOnSaveProvider";
 import { registerBuildStepsCommand } from "./zigBuildSteps";
 import { registerDiagnosticsProvider } from "./zigDiagnosticsProvider";
@@ -27,7 +28,12 @@ export async function activate(context: vscode.ExtensionContext) {
                 { language: "zig", scheme: "file" },
                 new ZigMainCodeLensProvider(),
             ),
+            vscode.commands.registerCommand("zig.createProject", createZigProject),
             vscode.commands.registerCommand("zig.toggleMultilineStringLiteral", toggleMultilineStringLiteral),
+            vscode.commands.registerCommand(
+                "zig.insertLineBreakWithoutContinuation",
+                insertLineBreakWithoutContinuation,
+            ),
         );
 
         void activateZls(context);
@@ -70,5 +76,20 @@ async function toggleMultilineStringLiteral() {
 
     await editor.edit((builder) => {
         builder.replace(range, newText);
+    });
+}
+
+async function insertLineBreakWithoutContinuation() {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) return;
+    const { document } = editor;
+
+    await editor.edit((builder) => {
+        for (const selection of editor.selections) {
+            const line = document.lineAt(selection.active.line);
+            const indent = line.text.slice(0, line.firstNonWhitespaceCharacterIndex);
+            builder.delete(selection);
+            builder.insert(selection.active, "\n" + indent);
+        }
     });
 }

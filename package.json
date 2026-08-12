@@ -389,6 +389,12 @@
         "description": "Debug the current Zig project / file"
       },
       {
+        "command": "zig.createProject",
+        "title": "Create Project",
+        "category": "Zig",
+        "description": "Create a Zig build project from the default or minimal template"
+      },
+      {
         "command": "zig.buildStep",
         "title": "Run Build Step...",
         "category": "Zig",
@@ -403,6 +409,12 @@
         "command": "zig.toggleMultilineStringLiteral",
         "title": "Toggle Multiline String Literal",
         "category": "Zig"
+      },
+      {
+        "command": "zig.insertLineBreakWithoutContinuation",
+        "title": "Insert Line Break Without Continuation",
+        "category": "Zig",
+        "description": "Insert a new line without continuing a doc comment (`///`, `//!`) or multiline string literal"
       },
       {
         "command": "zig.zls.enable",
@@ -425,6 +437,11 @@
         "command": "zig.toggleMultilineStringLiteral",
         "key": "alt+m alt+s",
         "when": "editorTextFocus && editorLangId == 'zig'"
+      },
+      {
+        "command": "zig.insertLineBreakWithoutContinuation",
+        "key": "shift+enter",
+        "when": "editorTextFocus && !editorReadonly && editorLangId == 'zig'"
       }
     ],
     "jsonValidation": [
