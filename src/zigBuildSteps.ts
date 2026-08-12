@@ -25,7 +25,10 @@ export function registerBuildStepsCommand(context: vscode.ExtensionContext): voi
 
 async function runBuildStep() {
     const zigPath = zigProvider.getZigPath();
-    if (!zigPath) return;
+    if (!zigPath) {
+        void vscode.window.showErrorMessage("Cannot run Zig build steps because Zig is not installed.");
+        return;
+    }
 
     const workspaceFolder = await pickWorkspaceFolder();
     if (!workspaceFolder) return;
