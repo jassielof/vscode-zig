@@ -6,6 +6,34 @@
   "publisher": "ziglang",
   "icon": "images/zig-icon.png",
   "license": "MIT",
+  "bugs": {
+    "url": "https://codeberg.org/ziglang/vscode-zig/issues"
+  },
+  "homepage": "https://codeberg.org/ziglang/vscode-zig",
+  "galleryBanner": {
+    "theme": "dark",
+    "color": "#000000"
+  },
+  "keywords": [
+    "zig",
+    "zon",
+    "lsp",
+    "language-server"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "Executable paths are ignored in untrusted workspaces to prevent a workspace from silently configuring code execution.",
+      "restrictedConfigurations": [
+        "zig.path",
+        "zig.zls.path",
+        "zig.zls.builtinPath",
+        "zig.zls.buildRunnerPath"
+      ]
+    }
+  },
+  "private": true,
+  "readme": "README.md",
   "repository": {
     "type": "git",
     "url": "https://codeberg.org/ziglang/vscode-zig"
@@ -21,7 +49,7 @@
     "workspaceContains:build.zig.zon",
     "workspaceContains:./.zigversion"
   ],
-  "main": "./out/extension",
+  "main": "./out/extension.js",
   "contributes": {
     "configurationDefaults": {
       "[zig]": {
@@ -435,6 +463,7 @@
     "test": "npm run compile && node ./node_modules/vscode/bin/test",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
+    "package": "vsce package",
     "format:check": "prettier --check .",
     "lint": "eslint"
   },
