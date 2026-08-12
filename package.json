@@ -462,7 +462,7 @@
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
-    "package": "vsce package",
+    "package": "vsce package --baseImagesUrl https://codeberg.org/ziglang/vscode-zig/raw/branch/main",
     "format:check": "prettier --check .",
     "lint": "eslint"
   },
