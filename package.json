@@ -466,7 +466,7 @@
     "typescript-eslint": "^8.0.0"
   },
   "dependencies": {
-    "libsodium-wrappers": "^0.7.15",
+    "libsodium-wrappers": "^0.8.4",
     "lodash-es": "^4.17.21",
     "semver": "^7.5.2",
     "vscode-languageclient": "10.0.0-next.15",
