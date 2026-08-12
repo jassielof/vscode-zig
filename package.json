@@ -23,12 +23,19 @@
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": "limited",
-      "description": "Executable paths are ignored in untrusted workspaces to prevent a workspace from silently configuring code execution.",
+      "description": "Workspace-provided Zig and ZLS paths, custom ZLS options, and automatic builds are ignored to prevent the workspace from configuring code execution.",
       "restrictedConfigurations": [
         "zig.path",
+        "zig.version",
+        "zig.libPath",
+        "zig.buildOnSaveProvider",
+        "zig.buildOnSaveArgs",
         "zig.zls.path",
+        "zig.zls.enabled",
         "zig.zls.builtinPath",
-        "zig.zls.buildRunnerPath"
+        "zig.zls.buildRunnerPath",
+        "zig.zls.globalCachePath",
+        "zig.zls.additionalOptions"
       ]
     }
   },
