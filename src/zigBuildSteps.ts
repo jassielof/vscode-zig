@@ -1,12 +1,11 @@
-import vscode from "vscode";
-
 import childProcess from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import util from "node:util";
+import vscode from "vscode";
 
-import { zigProvider } from "./zigSetup";
 import { getWorkspaceFolder } from "./zigUtil";
+import { zigProvider } from "./zigSetup";
 
 const execFile = util.promisify(childProcess.execFile);
 
