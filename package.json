@@ -470,6 +470,6 @@
     "lodash-es": "^4.17.21",
     "semver": "^7.5.2",
     "vscode-languageclient": "10.0.0-next.15",
-    "which": "^3.0.0"
+    "which": "^7.0.0"
   }
 }
