@@ -429,10 +429,9 @@
     ]
   },
   "scripts": {
-    "vscode:prepublish": "npm run build-base -- --minify",
-    "build-base": "esbuild --bundle --external:vscode src/extension.ts --outdir=out --platform=node --target=node20 --format=cjs",
-    "build": "npm run build-base -- --sourcemap",
-    "watch": "npm run build-base -- --sourcemap --watch",
+    "vscode:prepublish": "node esbuild.mjs --production",
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
     "test": "npm run compile && node ./node_modules/vscode/bin/test",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
