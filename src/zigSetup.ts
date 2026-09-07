@@ -92,7 +92,7 @@ async function getLatestTaggedZigVersion(context: vscode.ExtensionContext): Prom
 }
 
 /**
- * Returns a sorted list of all versions that are provided by Zig's [index.json](https://ziglang.org/download/index.json) and Mach's [index.json](https://pkg.machengine.org/zig/index.json).
+ * Returns a sorted list of all versions that are provided by Zig's [index.json](https://ziglang.org/download/index.json) and Mach's [index.json](https://pkg.hexops.org/zig/index.json).
  *
  * Throws an exception when no network connection is available.
  */
@@ -130,7 +130,7 @@ async function getVersionsCacheAware(context: vscode.ExtensionContext): Promise<
 /** Throws an exception when no network connection is available */
 async function fetchIndexJson(context: vscode.ExtensionContext): Promise<zigUtil.ZigVersion[]> {
     /* Order from highest to lowest priority */
-    const sources = ["https://ziglang.org/download/index.json", "https://pkg.machengine.org/zig/index.json"];
+    const sources = ["https://ziglang.org/download/index.json", "https://pkg.hexops.org/zig/index.json"];
     const results = await Promise.all(
         sources.map(async (url) => {
             const response = await fetch(url);
