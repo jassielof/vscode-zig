@@ -1,5 +1,7 @@
 import vscode from "vscode";
 
+import path from "path";
+
 import {
     ConfigurationParams,
     LSPAny,
@@ -24,6 +26,7 @@ const ZIG_MODE = [
 let versionManagerConfig: versionManager.Config;
 let statusItem: vscode.LanguageStatusItem;
 let outputChannel: vscode.LogOutputChannel;
+let activeZls: { exe: string; version: semver.SemVer } | null = null;
 export let client: LanguageClient | null = null;
 
 export async function restartClient(context: vscode.ExtensionContext): Promise<void> {
@@ -31,6 +34,7 @@ export async function restartClient(context: vscode.ExtensionContext): Promise<v
 
     if (!result) {
         await stopClient();
+        activeZls = null;
         updateStatusItem(null);
         return;
     }
@@ -39,6 +43,7 @@ export async function restartClient(context: vscode.ExtensionContext): Promise<v
         const newClient = await startClient(result.exe);
         void stopClient();
         client = newClient;
+        activeZls = result;
         updateStatusItem(result.version);
     } catch (reason) {
         if (reason instanceof Error) {
@@ -47,6 +52,7 @@ export async function restartClient(context: vscode.ExtensionContext): Promise<v
             void vscode.window.showWarningMessage("Failed to run ZLS language server");
         }
         updateStatusItem(null);
+        activeZls = null;
     }
 }
 
@@ -116,6 +122,27 @@ async function getZLSPath(context: vscode.ExtensionContext): Promise<{ exe: stri
 
     if (configuration.get<"ask" | "off" | "on">("enabled", "ask") !== "on") return null;
 
+    const configuredVersion = configuration.get<string>("version");
+    if (configuredVersion) {
+        const version = semver.parse(configuredVersion);
+        if (!version) {
+            void vscode.window.showErrorMessage(
+                `Invalid 'zig.zls.version': '${configuredVersion}' is not a ZLS version`,
+            );
+            return null;
+        }
+        try {
+            return {
+                exe: await versionManager.install(versionManagerConfig, version),
+                version,
+            };
+        } catch (error) {
+            const message = error instanceof Error ? `: ${error.message}` : "";
+            void vscode.window.showErrorMessage(`Failed to install ZLS ${version.raw}${message}`);
+            return null;
+        }
+    }
+
     const zigVersion = zigProvider.getZigVersion();
     if (!zigVersion) return null;
 
@@ -138,6 +165,264 @@ async function getZLSPath(context: vscode.ExtensionContext): Promise<{ exe: stri
         exe: zlsExePath,
         version: zlsVersion,
     };
+}
+
+export function getZlsToolchainSummary(): string {
+    if (!activeZls) return "Disabled or unavailable";
+    const configuration = vscode.workspace.getConfiguration("zig.zls");
+    if (configuration.get<string>("path")) return `${activeZls.version.raw} · custom/PATH`;
+    if (configuration.get<string>("version")) return `${activeZls.version.raw} · pinned`;
+    return `${activeZls.version.raw} · automatic`;
+}
+
+async function selectManagedZlsVersion(version: semver.SemVer): Promise<void> {
+    try {
+        await versionManager.install(versionManagerConfig, version);
+    } catch (error) {
+        const message = error instanceof Error ? `: ${error.message}` : "";
+        void vscode.window.showErrorMessage(`Failed to install ZLS ${version.raw}${message}`);
+        return;
+    }
+    const configuration = vscode.workspace.getConfiguration("zig.zls");
+    await zigUtil.workspaceConfigUpdateNoThrow(configuration, "path", undefined, true);
+    await zigUtil.workspaceConfigUpdateNoThrow(configuration, "version", version.raw, true);
+    await zigUtil.workspaceConfigUpdateNoThrow(configuration, "enabled", "on", true);
+}
+
+interface GitHubRelease {
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    tag_name: string;
+    draft: boolean;
+    prerelease: boolean;
+    assets: { name: string }[];
+}
+
+async function getZlsReleaseVersions(): Promise<semver.SemVer[]> {
+    const cacheKey = "zls-github-release-versions";
+    const cached = versionManagerConfig.context.globalState.get<{ timestamp: number; versions: string[] }>(cacheKey);
+    const oneHour = 60 * 60 * 1000;
+    if (cached && Date.now() - cached.timestamp < oneHour) {
+        return cached.versions.map((version) => new semver.SemVer(version));
+    }
+    try {
+        const headers = new Headers();
+        headers.set("Accept", "application/vnd.github+json");
+        headers.set("User-Agent", "ziglang-vscode-zig");
+        headers.set("X-GitHub-Api-Version", "2022-11-28");
+        const response = await fetch("https://api.github.com/repos/zigtools/zls/releases?per_page=100", {
+            headers,
+        });
+        if (!response.ok) throw new Error(`${response.statusText} (${response.status.toString()})`);
+
+        const releases = (await response.json()) as GitHubRelease[];
+        const versions = releases.flatMap((release) => {
+            if (release.draft) return [];
+            const version = semver.parse(release.tag_name);
+            if (!version) return [];
+            const artifactName = versionManagerConfig.getArtifactName(version);
+            const hasArtifact = release.assets.some((asset) => asset.name === artifactName);
+            const hasSignature = release.assets.some((asset) => asset.name === `${artifactName}.minisig`);
+            return hasArtifact && hasSignature ? [version] : [];
+        });
+        versions.sort(semver.rcompare);
+        await versionManagerConfig.context.globalState.update(cacheKey, {
+            timestamp: Date.now(),
+            versions: versions.map((version) => version.raw),
+        });
+        return versions;
+    } catch (error) {
+        if (cached) return cached.versions.map((version) => new semver.SemVer(version));
+        throw error;
+    }
+}
+
+async function selectZlsVersion(): Promise<void> {
+    const installedVersions = await versionManager.query(versionManagerConfig);
+    const zigVersion = zigProvider.getZigVersion();
+
+    const [releaseResult, compatibilityResult] = await vscode.window.withProgress(
+        {
+            location: vscode.ProgressLocation.Notification,
+            title: "Finding compatible ZLS releases...",
+            cancellable: false,
+        },
+        async () =>
+            await Promise.allSettled([
+                getZlsReleaseVersions(),
+                zigVersion ? fetchVersion(versionManagerConfig.context, zigVersion, true) : Promise.resolve(null),
+            ]),
+    );
+    const releaseVersions = releaseResult.status === "fulfilled" ? releaseResult.value : [];
+    const fetchError: unknown = releaseResult.status === "rejected" ? releaseResult.reason : undefined;
+    const recommendedVersion =
+        compatibilityResult.status === "fulfilled" ? compatibilityResult.value?.version ?? null : null;
+
+    const versions = new Map<
+        string,
+        { version: semver.SemVer; installed: boolean; available: boolean; recommended: boolean }
+    >();
+    for (const version of installedVersions) {
+        versions.set(version.raw, { version, installed: true, available: false, recommended: false });
+    }
+    for (const version of releaseVersions) {
+        const existing = versions.get(version.raw);
+        versions.set(version.raw, {
+            version,
+            installed: existing?.installed ?? false,
+            available: true,
+            recommended: false,
+        });
+    }
+    if (recommendedVersion) {
+        const existing = versions.get(recommendedVersion.raw);
+        versions.set(recommendedVersion.raw, {
+            version: recommendedVersion,
+            installed: existing?.installed ?? false,
+            available: true,
+            recommended: true,
+        });
+    }
+
+    if (!versions.size) {
+        const message = fetchError instanceof Error ? `: ${fetchError.message}` : "";
+        void vscode.window.showErrorMessage(`Unable to fetch ZLS releases${message}`);
+        return;
+    }
+    if (fetchError) {
+        void vscode.window.showWarningMessage("GitHub releases could not be reached. Showing installed ZLS versions.");
+    }
+
+    const sortedVersions = [...versions.values()].sort((lhs, rhs) => semver.rcompare(lhs.version, rhs.version));
+    const latestStable = sortedVersions.find((item) => item.available && item.version.prerelease.length === 0)?.version;
+    const recommended = sortedVersions.find((item) => item.recommended);
+    const items: (vscode.QuickPickItem & { version?: semver.SemVer })[] = [];
+    if (recommended && zigVersion) {
+        items.push(
+            {
+                label: `Recommended for Zig ${zigVersion.raw}`,
+                kind: vscode.QuickPickItemKind.Separator,
+            },
+            {
+                label: recommended.version.raw,
+                description: recommended.installed ? "recommended · installed" : "recommended",
+                detail: "Selected by the ZLS compatibility service for the active Zig toolchain",
+                version: recommended.version,
+            },
+            { label: "Other ZLS releases", kind: vscode.QuickPickItemKind.Separator },
+        );
+    }
+    items.push(
+        ...sortedVersions
+            .filter((item) => !item.recommended)
+            .map((item) => ({
+                label: item.version.raw,
+                description: item.installed ? "installed" : undefined,
+                detail: item.available ? undefined : "Installed locally; no matching GitHub release found",
+                version: item.version,
+            })),
+    );
+    const picked = await vscode.window.showQuickPick(items, {
+        title: "Select or Install Zig Language Server",
+        placeHolder: recommended
+            ? `Recommended: ${recommended.version.raw}`
+            : latestStable
+              ? `Latest stable: ${latestStable.raw}`
+              : undefined,
+    });
+    if (picked?.version) await selectManagedZlsVersion(picked.version);
+}
+
+export async function manageZlsToolchain(): Promise<void> {
+    const selection = await vscode.window.showQuickPick(
+        [
+            {
+                label: "$(sync) Automatic compatible version",
+                id: "automatic",
+                detail: "Recommended for the active Zig version",
+            },
+            { label: "$(cloud-download) Select or install a release...", id: "release" },
+            { label: "$(edit) Enter a version manually...", id: "install" },
+            { label: "$(file-binary) Select a custom executable...", id: "custom" },
+            { label: "$(trash) Remove installed versions...", id: "remove" },
+            { label: "$(circle-slash) Disable ZLS", id: "disable" },
+        ],
+        { title: `Manage ZLS · ${getZlsToolchainSummary()}` },
+    );
+    if (!selection) return;
+
+    const configuration = vscode.workspace.getConfiguration("zig.zls");
+    switch (selection.id) {
+        case "automatic":
+            await zigUtil.workspaceConfigUpdateNoThrow(configuration, "path", undefined, true);
+            await zigUtil.workspaceConfigUpdateNoThrow(configuration, "version", undefined, true);
+            await zigUtil.workspaceConfigUpdateNoThrow(configuration, "enabled", "on", true);
+            break;
+        case "release": {
+            await selectZlsVersion();
+            break;
+        }
+        case "install": {
+            const value = await vscode.window.showInputBox({
+                title: "Install ZLS version",
+                prompt: "Enter an exact ZLS version, for example 0.15.0",
+                validateInput(input) {
+                    return semver.valid(input.trim()) ? undefined : "Enter a valid semantic version";
+                },
+            });
+            if (value) await selectManagedZlsVersion(new semver.SemVer(value.trim()));
+            break;
+        }
+        case "custom": {
+            const uris = await vscode.window.showOpenDialog({
+                canSelectFiles: true,
+                canSelectFolders: false,
+                canSelectMany: false,
+                title: "Select ZLS executable",
+            });
+            if (!uris) return;
+            const result = zigUtil.resolveExePathAndVersion(uris[0].fsPath, "--version");
+            if ("message" in result) {
+                void vscode.window.showErrorMessage(`Unable to use this ZLS executable: ${result.message}`);
+                return;
+            }
+            await zigUtil.workspaceConfigUpdateNoThrow(configuration, "version", undefined, true);
+            await zigUtil.workspaceConfigUpdateNoThrow(configuration, "path", result.exe, true);
+            await zigUtil.workspaceConfigUpdateNoThrow(configuration, "enabled", "on", true);
+            break;
+        }
+        case "remove":
+            await removeInstalledZlsVersions();
+            break;
+        case "disable":
+            await zigUtil.workspaceConfigUpdateNoThrow(configuration, "enabled", "off", true);
+            break;
+    }
+}
+
+async function removeInstalledZlsVersions(): Promise<void> {
+    const installed = await versionManager.query(versionManagerConfig);
+    const removable = installed.filter(
+        (version) =>
+            path.resolve(versionManager.getInstallPath(versionManagerConfig, version)) !==
+            path.resolve(activeZls?.exe ?? ""),
+    );
+    if (!removable.length) {
+        void vscode.window.showInformationMessage("There are no unused managed ZLS versions to remove.");
+        return;
+    }
+    const selected = await vscode.window.showQuickPick(
+        removable.map((version) => ({ label: version.raw, version })),
+        { title: "Remove managed ZLS versions", placeHolder: "Select one or more versions", canPickMany: true },
+    );
+    if (!selected?.length) return;
+    const confirmation = await vscode.window.showWarningMessage(
+        `Permanently remove ${selected.length.toString()} managed ZLS ${selected.length === 1 ? "version" : "versions"}?`,
+        { modal: true },
+        "Remove",
+    );
+    if (confirmation !== "Remove") return;
+    await Promise.all(selected.map((item) => versionManager.uninstall(versionManagerConfig, item.version)));
+    void vscode.window.showInformationMessage(`Removed ${selected.map((item) => item.version.raw).join(", ")}.`);
 }
 
 function configurationMiddleware(params: ConfigurationParams): LSPAny[] | ResponseError {
@@ -536,11 +821,20 @@ export async function activate(context: vscode.ExtensionContext) {
             release: vscode.Uri.parse("https://builds.zigtools.org"),
             nightly: vscode.Uri.parse("https://builds.zigtools.org"),
         },
+        getReleaseUrl(version) {
+            return vscode.Uri.parse(`https://github.com/zigtools/zls/releases/download/${version.raw}`);
+        },
         getArtifactName(version) {
             const fileExtension = process.platform === "win32" ? "zip" : "tar.xz";
+            const archName = semver.gte(version, "0.15.0")
+                ? zigUtil.getZigArchName("arm")
+                : zigUtil.getZigArchName("armv7a");
+            if (version.prerelease.length === 0) {
+                return `zls-${archName}-${zigUtil.getZigOSName()}.${fileExtension}`;
+            }
             const targetName = semver.gte(version, "0.15.0")
-                ? `${zigUtil.getZigArchName("arm")}-${zigUtil.getZigOSName()}`
-                : `${zigUtil.getZigOSName()}-${zigUtil.getZigArchName("armv7a")}`;
+                ? `${archName}-${zigUtil.getZigOSName()}`
+                : `${zigUtil.getZigOSName()}-${archName}`;
             return `zls-${targetName}-${version.raw}.${fileExtension}`;
         },
     };
@@ -583,7 +877,8 @@ export async function activate(context: vscode.ExtensionContext) {
             // The `zig.path` config option is handled by `zigProvider.onChange`.
             if (
                 change.affectsConfiguration("zig.zls.enabled", undefined) ||
-                change.affectsConfiguration("zig.zls.path", undefined)
+                change.affectsConfiguration("zig.zls.path", undefined) ||
+                change.affectsConfiguration("zig.zls.version", undefined)
             ) {
                 await restartClient(context);
             }

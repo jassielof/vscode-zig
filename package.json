@@ -250,6 +250,11 @@
           "description": "Set a custom path to the `zls` executable. Example: `C:/zls/zig-cache/bin/zls.exe`. The string \"zls\" means lookup ZLS in PATH.",
           "format": "path"
         },
+        "zig.zls.version": {
+          "scope": "resource",
+          "type": "string",
+          "description": "Pin an extension-managed ZLS version. Leave empty to automatically select a ZLS version compatible with the active Zig version."
+        },
         "zig.zls.enableSnippets": {
           "scope": "resource",
           "type": "boolean",
@@ -396,8 +401,14 @@
       },
       {
         "command": "zig.install",
-        "title": "Install Zig",
+        "title": "Select Zig Version",
         "category": "Zig Setup"
+      },
+      {
+        "command": "zig.manageToolchains",
+        "title": "Manage Toolchains",
+        "category": "Zig Setup",
+        "description": "Install, select, and remove Zig and ZLS toolchains"
       },
       {
         "command": "zig.toggleMultilineStringLiteral",
@@ -472,6 +483,7 @@
     "typescript-eslint": "^8.0.0"
   },
   "dependencies": {
+    "@jassiel/zon": "npm:@jsr/jassiel__zon@^0.1.0",
     "libsodium-wrappers": "^0.7.15",
     "lodash-es": "^4.17.21",
     "semver": "^7.5.2",

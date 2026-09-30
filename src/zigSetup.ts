@@ -3,6 +3,7 @@ import vscode from "vscode";
 import fs from "fs/promises";
 import path from "path";
 
+import { type Manifest, type ParseResult, parse, stringify } from "@jassiel/zon";
 import semver from "semver";
 
 import * as minisign from "./minisign";
@@ -21,10 +22,11 @@ async function installZig(context: vscode.ExtensionContext, temporaryVersion?: s
     let version = temporaryVersion;
 
     if (!version) {
-        const wantedZig = await getWantedZigVersion(
-            context,
-            Object.values(WantedZigVersionSource) as WantedZigVersionSource[],
-        );
+        const wantedZig = await getWantedZigVersion(context, [
+            WantedZigVersionSource.zigVersionConfigOption,
+            WantedZigVersionSource.workspaceZigVersionFile,
+            WantedZigVersionSource.workspaceBuildZigZon,
+        ]);
         version = wantedZig?.version;
         if (wantedZig?.source === WantedZigVersionSource.workspaceBuildZigZon) {
             version = await findClosestSatisfyingZigVersion(context, wantedZig.version);
@@ -171,7 +173,7 @@ function sortVersions(versions: { name?: string; version: semver.SemVer; isMach:
     });
 }
 
-async function selectVersionAndInstall(context: vscode.ExtensionContext) {
+export async function selectVersionAndInstall(context: vscode.ExtensionContext) {
     const offlineVersions = await versionManager.query(versionManagerConfig);
 
     const versions: {
@@ -238,14 +240,18 @@ async function selectVersionAndInstall(context: vscode.ExtensionContext) {
     );
 
     sortVersions(versions);
-    const placeholderVersion = versions.find((item) => item.version.prerelease.length === 0)?.version;
+    const placeholderVersion = semver
+        .rsort(
+            versions.filter((item) => !item.isMach && item.version.prerelease.length === 0).map((item) => item.version),
+        )
+        .shift();
 
     const items: vscode.QuickPickItem[] = [];
 
     const workspaceZig = await getWantedZigVersion(context, [
+        WantedZigVersionSource.zigVersionConfigOption,
         WantedZigVersionSource.workspaceZigVersionFile,
         WantedZigVersionSource.workspaceBuildZigZon,
-        WantedZigVersionSource.zigVersionConfigOption,
     ]);
     if (workspaceZig !== null) {
         const alreadyInstalled = offlineVersions.some((item) => semver.eq(item.version, workspaceZig.version));
@@ -275,27 +281,42 @@ async function selectVersionAndInstall(context: vscode.ExtensionContext) {
         },
     );
 
-    let seenMachVersion = false;
-    for (const item of versions) {
-        const useName = item.isMach || item.version.prerelease.length !== 0;
-        if (item.isMach && !seenMachVersion && item.name !== "mach-latest") {
-            seenMachVersion = true;
+    const addVersions = (
+        title: string,
+        matchingVersions: typeof versions,
+        getLabel: (item: (typeof versions)[number]) => string,
+    ) => {
+        if (!matchingVersions.length) return;
+        items.push({ label: title, kind: vscode.QuickPickItemKind.Separator });
+        for (const item of matchingVersions.sort((lhs, rhs) => semver.rcompare(lhs.version, rhs.version))) {
             items.push({
-                label: "Mach's Nominated Zig versions",
-                kind: vscode.QuickPickItemKind.Separator,
+                label: getLabel(item),
+                description: item.offline ? "installed" : undefined,
+                detail: getLabel(item) === item.version.raw ? undefined : item.version.raw,
             });
         }
-        items.push({
-            label: (useName ? item.name : null) ?? item.version.raw,
-            description: item.offline ? "already installed" : undefined,
-            detail: useName ? (item.name ? item.version.raw : undefined) : undefined,
-        });
-    }
+    };
+
+    addVersions(
+        "Stable Zig releases",
+        versions.filter((item) => !item.isMach && item.version.prerelease.length === 0),
+        (item) => item.version.raw,
+    );
+    addVersions(
+        "Zig development builds",
+        versions.filter((item) => !item.isMach && item.version.prerelease.length !== 0),
+        (item) => (item.name === "nightly" ? "Nightly" : item.name ?? item.version.raw),
+    );
+    addVersions(
+        "Mach-nominated Zig builds",
+        versions.filter((item) => item.isMach),
+        (item) => (item.name === "mach-latest" ? "Latest Mach-nominated build" : item.name ?? item.version.raw),
+    );
 
     const selection = await vscode.window.showQuickPick(items, {
-        title: "Select Zig version to install",
+        title: "Select or Install Zig",
         canPickMany: false,
-        placeHolder: placeholderVersion?.raw,
+        placeHolder: placeholderVersion ? `Latest stable: ${placeholderVersion.raw}` : undefined,
     });
     if (selection === undefined) return;
 
@@ -323,6 +344,48 @@ async function selectVersionAndInstall(context: vscode.ExtensionContext) {
             await installZig(context, version);
             break;
     }
+}
+
+export function getZigToolchainSummary(): string {
+    const version = zigProvider.getZigVersion();
+    if (!version) return "Not configured";
+    const configuredPath = vscode.workspace.getConfiguration("zig").get<string>("path");
+    return `${version.raw}${configuredPath ? " · custom/PATH" : " · managed/project"}`;
+}
+
+export async function removeInstalledZigVersions(): Promise<void> {
+    const installed = await versionManager.query(versionManagerConfig);
+    const currentPath = zigProvider.getZigPath();
+    const removable = installed.filter(
+        (version) =>
+            path.resolve(versionManager.getInstallPath(versionManagerConfig, version)) !==
+            path.resolve(currentPath ?? ""),
+    );
+
+    if (removable.length === 0) {
+        void vscode.window.showInformationMessage("There are no unused managed Zig versions to remove.");
+        return;
+    }
+
+    const selected = await vscode.window.showQuickPick(
+        removable.map((version) => ({ label: version.raw, version })),
+        {
+            title: "Remove managed Zig versions",
+            placeHolder: "Select one or more versions",
+            canPickMany: true,
+        },
+    );
+    if (!selected?.length) return;
+
+    const confirmation = await vscode.window.showWarningMessage(
+        `Permanently remove ${selected.length.toString()} managed Zig ${selected.length === 1 ? "version" : "versions"}?`,
+        { modal: true },
+        "Remove",
+    );
+    if (confirmation !== "Remove") return;
+
+    await Promise.all(selected.map((item) => versionManager.uninstall(versionManagerConfig, item.version)));
+    void vscode.window.showInformationMessage(`Removed ${selected.map((item) => item.version.raw).join(", ")}.`);
 }
 
 async function showUpdateWorkspaceVersionDialog(
@@ -375,8 +438,19 @@ async function showUpdateWorkspaceVersionDialog(
             const metadata = await parseBuildZigZon();
             if (!metadata) throw new Error("failed to parse build.zig.zon");
 
+            metadata.parsed.value.minimum_zig_version = version.raw;
+            let updatedManifest = stringify(metadata.parsed, { space: 4 });
+            const originalText = metadata.document.getText();
+            if (originalText.endsWith("\n") && !updatedManifest.endsWith("\n")) {
+                updatedManifest += originalText.endsWith("\r\n") ? "\r\n" : "\n";
+            }
+
             const edit = new vscode.WorkspaceEdit();
-            edit.replace(metadata.document.uri, metadata.minimumZigVersionSourceRange, version.raw);
+            edit.replace(
+                metadata.document.uri,
+                new vscode.Range(metadata.document.positionAt(0), metadata.document.positionAt(originalText.length)),
+                updatedManifest,
+            );
             await vscode.workspace.applyEdit(edit);
             break;
         }
@@ -390,9 +464,8 @@ async function showUpdateWorkspaceVersionDialog(
 interface BuildZigZonMetadata {
     /** The `build.zig.zon` document. */
     document: vscode.TextDocument;
+    parsed: ParseResult<Manifest>;
     minimumZigVersion: semver.SemVer;
-    /** `.minimum_zig_version = "<start>0.13.0<end>"` */
-    minimumZigVersionSourceRange: vscode.Range;
 }
 
 function getWorkspaceFolder(): vscode.WorkspaceFolder | null {
@@ -418,23 +491,19 @@ async function parseBuildZigZon(): Promise<BuildZigZonMetadata | null> {
     } catch {
         return null;
     }
-    // Not perfect, but good enough
-    const regex = /\n\s*\.minimum_zig_version\s=\s\"(.*)\"/;
-    const matches = regex.exec(manifest.getText());
-    if (!matches) return null;
+    try {
+        const parsed = parse<Manifest>(manifest.getText(), { preserveComments: true });
+        const version = semver.parse(parsed.value.minimum_zig_version ?? "");
+        if (!version) return null;
 
-    const versionString = matches[1];
-    const version = semver.parse(versionString);
-    if (!version) return null;
-
-    const startPosition = manifest.positionAt(matches.index + matches[0].length - versionString.length - 1);
-    const endPosition = startPosition.translate(0, versionString.length);
-
-    return {
-        document: manifest,
-        minimumZigVersion: version,
-        minimumZigVersionSourceRange: new vscode.Range(startPosition, endPosition),
-    };
+        return {
+            document: manifest,
+            parsed,
+            minimumZigVersion: version,
+        };
+    } catch {
+        return null;
+    }
 }
 
 /** The order of these enums defines the default order in which these sources are executed. */
@@ -508,10 +577,10 @@ async function getWantedZigVersion(
 function updateStatusItem(item: vscode.StatusBarItem, version: semver.SemVer | null) {
     item.name = "Zig Version";
     item.text = version?.toString() ?? "not installed";
-    item.tooltip = "Select Zig Version";
+    item.tooltip = "Manage Zig and ZLS Toolchains";
     item.command = {
-        title: "Select Version",
-        command: "zig.install",
+        title: "Manage Toolchains",
+        command: "zig.manageToolchains",
     };
     if (version) {
         item.backgroundColor = undefined;
@@ -531,8 +600,8 @@ function updateLanguageStatusItem(item: vscode.LanguageStatusItem, version: semv
         item.severity = vscode.LanguageStatusSeverity.Error;
     }
     item.command = {
-        title: "Select Version",
-        command: "zig.install",
+        title: "Manage Toolchains",
+        command: "zig.manageToolchains",
     };
 }
 
@@ -610,9 +679,7 @@ async function updateStatus(context: vscode.ExtensionContext): Promise<void> {
                     break;
                 }
                 case "open build.zig.zon": {
-                    void vscode.window.showTextDocument(buildZigZonMetadata.document, {
-                        selection: buildZigZonMetadata.minimumZigVersionSourceRange,
-                    });
+                    void vscode.window.showTextDocument(buildZigZonMetadata.document);
                     break;
                 }
             }
