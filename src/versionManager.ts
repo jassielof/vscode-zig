@@ -17,8 +17,6 @@ import * as zigUtil from "./zigUtil";
 const execFile = util.promisify(childProcess.execFile);
 const chmod = util.promisify(fs.chmod);
 
-/** The maxmimum number of installation that can be store until they will be removed */
-const maxInstallCount = 5;
 /** Maps concurrent requests to install a version of an exe to a single promise */
 const inProgressInstalls = new Map<string, Promise<string>>();
 
@@ -41,6 +39,8 @@ export interface Config {
         release: vscode.Uri;
         nightly: vscode.Uri;
     };
+    /** Override the release download directory for a particular version. */
+    getReleaseUrl?: (version: semver.SemVer) => vscode.Uri;
     /**
      * Get the artifact file name for a specific version.
      *
@@ -121,7 +121,9 @@ async function installGuarded(config: Config, version: semver.SemVer): Promise<s
             }
 
             const canonicalUrl =
-                version.prerelease.length === 0 ? config.canonicalUrl.release : config.canonicalUrl.nightly;
+                version.prerelease.length === 0
+                    ? config.getReleaseUrl?.(version) ?? config.canonicalUrl.release
+                    : config.canonicalUrl.nightly;
             const mirrorName = new URL(canonicalUrl.toString()).host;
             return await installFromMirror(config, version, canonicalUrl, mirrorName, tarPath, progress, cancelToken);
         },
@@ -254,7 +256,7 @@ async function installFromMirror(
     }
 
     const exeVersion = zigUtil.getVersion(exeUri.fsPath, config.versionArg);
-    if (!exeVersion || exeVersion.compare(version) !== 0) {
+    if (exeVersion?.compare(version) !== 0) {
         try {
             await vscode.workspace.fs.delete(installDir, { recursive: true, useTrash: false });
         } catch {}
@@ -263,18 +265,6 @@ async function installFromMirror(
     }
 
     await chmod(exeUri.fsPath, 0o755);
-
-    try {
-        await removeUnusedInstallations(config);
-    } catch (err) {
-        if (err instanceof Error) {
-            void vscode.window.showWarningMessage(
-                `Failed to uninstall unused ${config.title} versions: ${err.message}`,
-            );
-        } else {
-            void vscode.window.showWarningMessage(`Failed to uninstall unused ${config.title} versions`);
-        }
-    }
 
     return exeUri.fsPath;
 }
@@ -301,6 +291,21 @@ export async function query(config: Config): Promise<semver.SemVer[]> {
     return available;
 }
 
+/** Returns the path where a managed version is installed. */
+export function getInstallPath(config: Config, version: semver.SemVer): string {
+    const exeName = config.exeName + (process.platform === "win32" ? ".exe" : "");
+    const subDirName = `${getTargetName()}-${version.raw}`;
+    return vscode.Uri.joinPath(config.context.globalStorageUri, config.exeName, subDirName, exeName).fsPath;
+}
+
+/** Removes a locally managed version. */
+export async function uninstall(config: Config, version: semver.SemVer): Promise<void> {
+    const subDirName = `${getTargetName()}-${version.raw}`;
+    const installDir = vscode.Uri.joinPath(config.context.globalStorageUri, config.exeName, subDirName);
+    await vscode.workspace.fs.delete(installDir, { recursive: true, useTrash: false });
+    await config.context.globalState.update(`${config.exeName}-last-access-time-${subDirName}`, undefined);
+}
+
 async function getTarExePath(): Promise<string | null> {
     if (process.platform === "win32" && process.env["SYSTEMROOT"]) {
         // We may be running from within Git Bash which adds GNU tar to
@@ -322,41 +327,6 @@ async function setLastAccessTime(config: Config, version: semver.SemVer): Promis
         `${config.exeName}-last-access-time-${getTargetName()}-${version.raw}`,
         Date.now(),
     );
-}
-
-/** Remove installations with the oldest last access time until at most `VersionManager.maxInstallCount` versions remain. */
-async function removeUnusedInstallations(config: Config) {
-    const storageDir = vscode.Uri.joinPath(config.context.globalStorageUri, config.exeName);
-
-    const keys: { key: string; installDir: vscode.Uri; lastAccessTime: number }[] = [];
-
-    try {
-        for (const [name, fileType] of await vscode.workspace.fs.readDirectory(storageDir)) {
-            const key = `${config.exeName}-last-access-time-${name}`;
-            const uri = vscode.Uri.joinPath(storageDir, name);
-            const lastAccessTime = config.context.globalState.get<number>(key);
-
-            if (!lastAccessTime || fileType !== vscode.FileType.Directory) {
-                await vscode.workspace.fs.delete(uri, { recursive: true, useTrash: false });
-            } else {
-                keys.push({
-                    key: key,
-                    installDir: uri,
-                    lastAccessTime: lastAccessTime,
-                });
-            }
-        }
-    } catch (e) {
-        if (e instanceof vscode.FileSystemError && e.code === "FileNotFound") return;
-        throw e;
-    }
-
-    keys.sort((lhs, rhs) => rhs.lastAccessTime - lhs.lastAccessTime);
-
-    for (const item of keys.slice(maxInstallCount)) {
-        await vscode.workspace.fs.delete(item.installDir, { recursive: true, useTrash: false });
-        await config.context.globalState.update(item.key, undefined);
-    }
 }
 
 /** Remove after some time has passed from the prefix change. */

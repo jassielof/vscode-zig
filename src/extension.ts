@@ -4,6 +4,7 @@ import { activate as activateZls, deactivate as deactivateZls } from "./zls";
 import ZigMainCodeLensProvider from "./zigMainCodeLens";
 import ZigTestRunnerProvider from "./zigTestRunnerProvider";
 import { createZigProject } from "./zigProject";
+import { manageToolchains } from "./toolchainManager";
 import { registerBuildOnSaveProvider } from "./zigBuildOnSaveProvider";
 import { registerBuildStepsCommand } from "./zigBuildSteps";
 import { registerDiagnosticsProvider } from "./zigDiagnosticsProvider";
@@ -29,6 +30,9 @@ export async function activate(context: vscode.ExtensionContext) {
                 new ZigMainCodeLensProvider(),
             ),
             vscode.commands.registerCommand("zig.createProject", createZigProject),
+            vscode.commands.registerCommand("zig.manageToolchains", async () => {
+                await manageToolchains(context);
+            }),
             vscode.commands.registerCommand("zig.toggleMultilineStringLiteral", toggleMultilineStringLiteral),
             vscode.commands.registerCommand(
                 "zig.insertLineBreakWithoutContinuation",
