@@ -21,10 +21,7 @@ async function installZig(context: vscode.ExtensionContext, temporaryVersion?: s
     let version = temporaryVersion;
 
     if (!version) {
-        const wantedZig = await getWantedZigVersion(
-            context,
-            Object.values(WantedZigVersionSource),
-        );
+        const wantedZig = await getWantedZigVersion(context, Object.values(WantedZigVersionSource));
         version = wantedZig?.version;
         if (wantedZig?.source === WantedZigVersionSource.workspaceBuildZigZon) {
             version = await findClosestSatisfyingZigVersion(context, wantedZig.version);
