@@ -243,7 +243,7 @@ async function installFromMirror(
             await vscode.workspace.fs.delete(installDir, { recursive: true, useTrash: false });
         } catch {}
         if (err instanceof Error) {
-            throw new Error(`Failed to extract ${config.title} tarball: ${err.message}`);
+            throw Object.assign(new Error(`Failed to extract ${config.title} tarball: ${err.message}`), { cause: err });
         } else {
             throw err;
         }
@@ -254,7 +254,7 @@ async function installFromMirror(
     }
 
     const exeVersion = zigUtil.getVersion(exeUri.fsPath, config.versionArg);
-    if (!exeVersion || exeVersion.compare(version) !== 0) {
+    if (exeVersion?.compare(version) !== 0) {
         try {
             await vscode.workspace.fs.delete(installDir, { recursive: true, useTrash: false });
         } catch {}

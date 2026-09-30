@@ -270,7 +270,7 @@ export default class ZigTestRunnerProvider {
                     for (const disposable of disposables) {
                         disposable.dispose();
                     }
-                    reject(err as Error);
+                    reject(err instanceof Error ? err : new Error(String(err)));
                 },
             );
         });
