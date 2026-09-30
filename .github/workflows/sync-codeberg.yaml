@@ -1,0 +1,33 @@
+name: Sync from Codeberg
+
+on:
+  schedule:
+    - cron: "23 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-codeberg-main
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Merge Codeberg main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout GitHub main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Merge Codeberg main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add codeberg https://codeberg.org/ziglang/vscode-zig.git
+          git fetch codeberg main
+          git merge --no-edit codeberg/main
+          git push origin HEAD:main
