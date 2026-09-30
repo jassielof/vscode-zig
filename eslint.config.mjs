@@ -1,14 +1,19 @@
 // @ts-check
 
-import { defineConfig } from "eslint/config";
+import js from "@eslint/js";
+import { defineConfig, globalIgnores } from "eslint/config";
 import tseslint from "typescript-eslint";
 import prettierConfig from "eslint-config-prettier";
 
 export default defineConfig(
-    tseslint.configs.stylisticTypeChecked,
-    tseslint.configs.strictTypeChecked,
-    prettierConfig,
     {
+        files: ["**/*.ts"],
+        extends: [
+            js.configs.recommended,
+            tseslint.configs.strictTypeChecked,
+            tseslint.configs.stylisticTypeChecked,
+            prettierConfig,
+        ],
         rules: {
             "@typescript-eslint/naming-convention": "error",
             "@typescript-eslint/switch-exhaustiveness-check": ["error", { considerDefaultExhaustiveForUnions: true }],
@@ -17,6 +22,7 @@ export default defineConfig(
             "no-shadow": "off",
             "@typescript-eslint/no-shadow": "error",
             "no-duplicate-imports": "error",
+            "no-empty": ["error", { allowEmptyCatch: true }],
             "sort-imports": ["error", { allowSeparatedGroups: true }],
         },
         languageOptions: {
@@ -26,7 +32,5 @@ export default defineConfig(
             },
         },
     },
-    {
-        ignores: ["**/*.js", "**/*.mjs"],
-    },
+    globalIgnores(["**/*.js", "**/*.mjs"]),
 );

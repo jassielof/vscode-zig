@@ -303,11 +303,12 @@ async function selectVersionAndInstall(context: vscode.ExtensionContext) {
         case "Use Workspace Version":
             await installZig(context);
             break;
-        case "Use Zig in PATH":
+        case "Use Zig in PATH": {
             const zigConfig = vscode.workspace.getConfiguration("zig");
             await zigUtil.workspaceConfigUpdateNoThrow(zigConfig, "path", "zig", true);
             break;
-        case "Manually Specify Path":
+        }
+        case "Manually Specify Path": {
             const uris = await vscode.window.showOpenDialog({
                 canSelectFiles: true,
                 canSelectFolders: false,
@@ -317,11 +318,13 @@ async function selectVersionAndInstall(context: vscode.ExtensionContext) {
             if (!uris) return;
             await zigProvider.setAndSave(uris[0].fsPath);
             break;
-        default:
+        }
+        default: {
             const version = new semver.SemVer(selection.detail ?? selection.label);
             await showUpdateWorkspaceVersionDialog(version, workspaceZig?.source);
             await installZig(context, version);
             break;
+        }
     }
 }
 
@@ -419,7 +422,7 @@ async function parseBuildZigZon(): Promise<BuildZigZonMetadata | null> {
         return null;
     }
     // Not perfect, but good enough
-    const regex = /\n\s*\.minimum_zig_version\s=\s\"(.*)\"/;
+    const regex = /\n\s*\.minimum_zig_version\s=\s"(.*)"/;
     const matches = regex.exec(manifest.getText());
     if (!matches) return null;
 
@@ -475,13 +478,14 @@ async function getWantedZigVersion(
                         result = semver.parse(zigVersionString.toString().trim());
                     }
                     break;
-                case WantedZigVersionSource.workspaceBuildZigZon:
+                case WantedZigVersionSource.workspaceBuildZigZon: {
                     const metadata = await parseBuildZigZon();
                     if (metadata?.minimumZigVersion) {
                         result = metadata.minimumZigVersion;
                     }
                     break;
-                case WantedZigVersionSource.zigVersionConfigOption:
+                }
+                case WantedZigVersionSource.zigVersionConfigOption: {
                     const versionString = vscode.workspace.getConfiguration("zig").get<string>("version");
                     if (versionString) {
                         result = semver.parse(versionString);
@@ -492,6 +496,7 @@ async function getWantedZigVersion(
                         }
                     }
                     break;
+                }
             }
         } catch {}
 
