@@ -86,9 +86,8 @@ async function stopClient(): Promise<void> {
 async function getZLSPath(context: vscode.ExtensionContext): Promise<{ exe: string; version: semver.SemVer } | null> {
     const configuration = vscode.workspace.getConfiguration("zig.zls");
     let zlsExePath = configuration.get<string>("path");
-    let zlsVersion: semver.SemVer | null = null;
 
-    if (!!zlsExePath) {
+    if (zlsExePath) {
         // This will fail on older ZLS version that do not support `zls --version`.
         // It should be more likely that the given executable is invalid than someone using ZLS 0.9.0 or older.
         const result = zigUtil.resolveExePathAndVersion(zlsExePath, "--version");
@@ -97,11 +96,12 @@ async function getZLSPath(context: vscode.ExtensionContext): Promise<{ exe: stri
                 .showErrorMessage(`Unexpected 'zig.zls.path': ${result.message}`, "install ZLS", "open settings")
                 .then(async (response) => {
                     switch (response) {
-                        case "install ZLS":
+                        case "install ZLS": {
                             const zlsConfig = vscode.workspace.getConfiguration("zig.zls");
                             await zigUtil.workspaceConfigUpdateNoThrow(zlsConfig, "enabled", "on", true);
                             await zigUtil.workspaceConfigUpdateNoThrow(zlsConfig, "path", undefined);
                             break;
+                        }
                         case "open settings":
                             await vscode.commands.executeCommand("workbench.action.openSettings", "zig.zls.path");
                             break;
@@ -124,7 +124,6 @@ async function getZLSPath(context: vscode.ExtensionContext): Promise<{ exe: stri
 
     try {
         zlsExePath = await versionManager.install(versionManagerConfig, result.version);
-        zlsVersion = result.version;
     } catch (err) {
         if (err instanceof Error) {
             void vscode.window.showErrorMessage(`Failed to install ZLS ${result.version.toString()}: ${err.message}`);
@@ -136,7 +135,7 @@ async function getZLSPath(context: vscode.ExtensionContext): Promise<{ exe: stri
 
     return {
         exe: zlsExePath,
-        version: zlsVersion,
+        version: result.version,
     };
 }
 
@@ -275,7 +274,7 @@ async function validateAdditionalOptions(): Promise<void> {
             "Show zig.zls.additionalOptions",
         );
         switch (response) {
-            case `Use ${optionName} instead`:
+            case `Use ${optionName} instead`: {
                 const { [optionName]: newValue, ...updatedAdditionalOptions } = additionalOptions;
                 await zigUtil.workspaceConfigUpdateNoThrow(
                     configuration,
@@ -285,6 +284,7 @@ async function validateAdditionalOptions(): Promise<void> {
                 );
                 await zigUtil.workspaceConfigUpdateNoThrow(configuration, section, newValue, true);
                 break;
+            }
             case "Show zig.zls.additionalOptions":
                 await vscode.commands.executeCommand("workbench.action.openSettingsJson", {
                     revealSetting: { key: "zig.zls.additionalOptions" },
@@ -386,7 +386,7 @@ async function fetchVersion(
 
 async function isEnabled(): Promise<boolean> {
     const zlsConfig = vscode.workspace.getConfiguration("zig.zls");
-    if (!!zlsConfig.get<string>("path")) return true;
+    if (zlsConfig.get<string>("path")) return true;
 
     switch (zlsConfig.get<"ask" | "off" | "on">("enabled", "ask")) {
         case "on":

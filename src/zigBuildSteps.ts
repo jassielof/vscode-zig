@@ -41,7 +41,7 @@ async function runBuildStep() {
 
     const pickPromise = new Promise<ZigBuildStepQuickPickItem | undefined>((resolve) => {
         quickPick.onDidAccept(() => {
-            resolve(quickPick.selectedItems[0] as ZigBuildStepQuickPickItem | undefined);
+            resolve(quickPick.selectedItems[0]);
         });
         quickPick.onDidHide(() => {
             resolve(undefined);
