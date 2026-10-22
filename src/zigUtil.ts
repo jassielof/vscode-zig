@@ -19,6 +19,10 @@ export function handleConfigOption(input: string, workspaceFolder: vscode.Worksp
         input = input.replaceAll("${userHome}", os.homedir());
     }
 
+    if (input.startsWith("~")) {
+        input = path.join(os.homedir(), input.substring(1));
+    }
+
     if (workspaceFolder === "guess") {
         workspaceFolder = vscode.workspace.workspaceFolders?.length ? vscode.workspace.workspaceFolders[0] : "none";
     }
@@ -75,10 +79,6 @@ export function resolveExePathAndVersion(
 
     // allow passing predefined variables
     cmd = handleConfigOption(cmd, "guess");
-
-    if (cmd.startsWith("~")) {
-        cmd = path.join(os.homedir(), cmd.substring(1));
-    }
 
     const isWindows = os.platform() === "win32";
     const isAbsolute = path.isAbsolute(cmd);
