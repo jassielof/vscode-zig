@@ -6,7 +6,7 @@ import util from "util";
 
 import { DebouncedFunc, throttle } from "lodash-es";
 
-import { getWorkspaceFolder, isWorkspaceFile, workspaceConfigUpdateNoThrow } from "./zigUtil";
+import { getWorkspaceFolder, handleConfigOption, isWorkspaceFile, workspaceConfigUpdateNoThrow } from "./zigUtil";
 import { zigProvider } from "./zigSetup";
 
 const execFile = util.promisify(childProcess.execFile);
@@ -131,7 +131,8 @@ export default class ZigTestRunnerProvider {
         }
 
         const testUri = test.uri;
-        const wsFolder = getWorkspaceFolder(testUri.fsPath)?.uri.fsPath ?? path.dirname(testUri.fsPath);
+        const wsFolder = getWorkspaceFolder(testUri.fsPath);
+        const cwd = wsFolder?.uri.fsPath ?? path.dirname(testUri.fsPath);
 
         const parts = test.id.split(".");
         const lastPart = parts[parts.length - 1];
@@ -139,11 +140,16 @@ export default class ZigTestRunnerProvider {
         const testArgsConf = config.get<string[]>("testArgs") ?? [];
         const args: string[] =
             testArgsConf.length > 0
-                ? testArgsConf.map((v) => v.replace("${filter}", lastPart).replace("${path}", testUri.fsPath))
+                ? testArgsConf.map((v) =>
+                      handleConfigOption(
+                          v.replace("${filter}", lastPart).replace("${path}", testUri.fsPath),
+                          wsFolder ?? "guess",
+                      ),
+                  )
                 : [];
 
         try {
-            const { stderr: output } = await execFile(zigPath, args, { cwd: wsFolder });
+            const { stderr: output } = await execFile(zigPath, args, { cwd: cwd });
 
             return { output: output.replaceAll("\n", "\r\n"), success: true };
         } catch (e) {
@@ -283,17 +289,24 @@ export default class ZigTestRunnerProvider {
             throw new Error("Unable to build test binary without Zig");
         }
 
-        const wsFolder = getWorkspaceFolder(testFilePath)?.uri.fsPath ?? path.dirname(testFilePath);
-        const outputDir = path.join(wsFolder, "zig-out", "bin");
+        const wsFolder = getWorkspaceFolder(testFilePath);
+        const cwd = wsFolder?.uri.fsPath ?? path.dirname(testFilePath);
+        const outputDir = path.join(cwd, "zig-out", "bin");
         const binaryPath = path.join(outputDir, "debug-unit-tests");
         await vscode.workspace.fs.createDirectory(vscode.Uri.file(outputDir));
 
         const debugTestArgsConf = config.get<string[]>("debugTestArgs") ?? [];
         const args = debugTestArgsConf.map((arg) =>
-            arg.replace("${filter}", testDesc).replace("${path}", testFilePath).replace("${binaryPath}", binaryPath),
+            handleConfigOption(
+                arg
+                    .replace("${filter}", testDesc)
+                    .replace("${path}", testFilePath)
+                    .replace("${binaryPath}", binaryPath),
+                wsFolder ?? "guess",
+            ),
         );
 
-        const { stdout, stderr } = await execFile(zigPath, args, { cwd: wsFolder });
+        const { stdout, stderr } = await execFile(zigPath, args, { cwd: cwd });
         if (stderr) {
             run.appendOutput(stderr.replaceAll("\n", "\r\n"));
             throw new Error(`Failed to build test binary: ${stderr}`);
