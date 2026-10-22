@@ -196,7 +196,7 @@ async function selectVersionAndInstall(context: vscode.ExtensionContext) {
             const installed = offlineVersions.some((item) => semver.eq(item.version, version));
             items.push({
                 label: "Use Workspace Version",
-                detail: version.raw,
+                detail: version.toString(),
                 description: installed ? "already installed" : undefined,
                 onDidAccept: async () => {
                     await showUpdateWorkspaceVersionDialog(version, workspaceZig.source);
@@ -286,9 +286,9 @@ async function selectVersionAndInstall(context: vscode.ExtensionContext) {
             }
 
             items.push({
-                label: item.label ?? item.version.raw,
+                label: item.label ?? item.version.toString(),
                 description: item.installed ? "already installed" : undefined,
-                detail: item.label ? item.version.raw : undefined,
+                detail: item.label ? item.version.toString() : undefined,
                 onDidAccept: async () => {
                     await showUpdateWorkspaceVersionDialog(item.version, workspaceZig?.source);
                     await installZig(context, item.version);
