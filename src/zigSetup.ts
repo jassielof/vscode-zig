@@ -180,12 +180,15 @@ function getZigArchName(zigVersion: semver.SemVer): string {
 interface QuickPickItem extends vscode.QuickPickItem {
     onDidAccept?: () => Promise<void>;
 }
+interface QuickInputButton extends vscode.QuickInputButton {
+    onDidAccept?: () => Promise<void>;
+}
 
 async function selectVersionAndInstall(context: vscode.ExtensionContext) {
     const workspaceZig = await getWantedZigVersion(context, Object.values(WantedZigVersionSource));
     const zigInPath = zigUtil.resolveExePathAndVersion("zig", "version");
 
-    const offlineVersions = await versionManager.query(versionManagerConfig);
+    let offlineVersions = await versionManager.query(versionManagerConfig);
     let onlineVersions: zigUtil.ZigVersion[] = [];
 
     function createItems(): QuickPickItem[] {
@@ -285,10 +288,36 @@ async function selectVersionAndInstall(context: vscode.ExtensionContext) {
                 });
             }
 
+            let buttons: QuickInputButton[] | undefined = undefined;
+            if (item.installed) {
+                const uninstallbutton: QuickInputButton = {
+                    iconPath: new vscode.ThemeIcon("trash"),
+                    tooltip: "Uninstall",
+                    onDidAccept: async () => {
+                        try {
+                            await versionManager.uninstall(versionManagerConfig, item.version);
+                            offlineVersions = offlineVersions.filter((version) => version.raw !== item.version.raw);
+                        } catch (err) {
+                            if (err instanceof Error) {
+                                void vscode.window.showErrorMessage(
+                                    `Failed to uninstall Zig ${item.version.toString()}: ${err.message}`,
+                                );
+                            } else {
+                                void vscode.window.showErrorMessage(
+                                    `Failed to uninstall Zig ${item.version.toString()}`,
+                                );
+                            }
+                        }
+                    },
+                };
+                buttons = [uninstallbutton];
+            }
+
             items.push({
                 label: item.label ?? item.version.toString(),
                 description: item.installed ? "already installed" : undefined,
                 detail: item.label ? item.version.toString() : undefined,
+                buttons: buttons,
                 onDidAccept: async () => {
                     await showUpdateWorkspaceVersionDialog(item.version, workspaceZig?.source);
                     await installZig(context, item.version);
@@ -308,6 +337,12 @@ async function selectVersionAndInstall(context: vscode.ExtensionContext) {
         if (!selection.onDidAccept) return;
         quickpick.dispose();
         await selection.onDidAccept();
+    });
+    quickpick.onDidTriggerItemButton(async (e) => {
+        const button = e.button as QuickInputButton;
+        if (!button.onDidAccept) return;
+        await button.onDidAccept();
+        quickpick.items = createItems();
     });
 
     const result = await getVersionsCacheAware(context);

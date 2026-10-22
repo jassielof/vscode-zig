@@ -279,6 +279,15 @@ async function installFromMirror(
     return exeUri.fsPath;
 }
 
+export async function uninstall(config: Config, version: semver.SemVer) {
+    const storageDir = vscode.Uri.joinPath(config.context.globalStorageUri, config.exeName);
+    const installDir = vscode.Uri.joinPath(storageDir, `${getTargetName()}-${version.raw}`);
+    await vscode.workspace.fs.delete(installDir, { recursive: true, useTrash: false });
+
+    const key = `${config.exeName}-last-access-time-${getTargetName()}-${version.raw}`;
+    await config.context.globalState.update(key, undefined);
+}
+
 /** Returns all locally installed versions */
 export async function query(config: Config): Promise<semver.SemVer[]> {
     const available: semver.SemVer[] = [];
