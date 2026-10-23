@@ -400,6 +400,11 @@
         "category": "Zig Setup"
       },
       {
+        "command": "zig.uninstall",
+        "title": "Uninstall Zig & ZLS installations",
+        "category": "Zig Setup"
+      },
+      {
         "command": "zig.toggleMultilineStringLiteral",
         "title": "Toggle Multiline String Literal",
         "category": "Zig"

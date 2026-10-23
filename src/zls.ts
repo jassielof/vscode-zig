@@ -21,7 +21,7 @@ const ZIG_MODE = [
     { language: "zig", scheme: "untitled" },
 ];
 
-let versionManagerConfig: versionManager.Config;
+export let versionManagerConfig: versionManager.Config;
 let statusItem: vscode.LanguageStatusItem;
 let outputChannel: vscode.LogOutputChannel;
 export let client: LanguageClient | null = null;
