@@ -550,8 +550,9 @@ function updateEnvironmentVariableCollection(context: vscode.ExtensionContext) {
 
     const configuration = vscode.workspace.getConfiguration("zig");
 
-    const zigLibPath = configuration.get<string>("libPath");
+    let zigLibPath = configuration.get<string>("libPath");
     if (zigLibPath) {
+        zigLibPath = zigUtil.handleConfigOption(zigLibPath, "guess");
         context.environmentVariableCollection.replace("ZIG_LIB_DIR", zigLibPath);
     } else {
         context.environmentVariableCollection.delete("ZIG_LIB_DIR");

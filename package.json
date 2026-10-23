@@ -336,7 +336,7 @@
         "zig.zls.skipStdReferences": {
           "scope": "resource",
           "type": "boolean",
-          "description": "When true, skips searching for references in the standard library. Improves lookup speed for functions in user's code. Renaming and go-to-definition will continue to work as is",
+          "description": "No longer used. May be brought back to configure how symbol references in the standard library should behave",
           "default": false
         },
         "zig.zls.preferAstCheckAsChildProcess": {
@@ -349,12 +349,6 @@
           "scope": "resource",
           "type": "string",
           "description": "Override the path to 'builtin' module. Automatically resolved if unset.",
-          "format": "path"
-        },
-        "zig.zls.buildRunnerPath": {
-          "scope": "resource",
-          "type": "string",
-          "description": "Specify a custom build runner to resolve build system information.",
           "format": "path"
         },
         "zig.zls.globalCachePath": {
