@@ -6,6 +6,41 @@
   "publisher": "ziglang",
   "icon": "images/zig-icon.png",
   "license": "MIT",
+  "bugs": {
+    "url": "https://codeberg.org/ziglang/vscode-zig/issues"
+  },
+  "homepage": "https://codeberg.org/ziglang/vscode-zig",
+  "galleryBanner": {
+    "theme": "dark",
+    "color": "#000000"
+  },
+  "keywords": [
+    "zig",
+    "zon",
+    "lsp",
+    "language-server"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "Workspace-provided Zig and ZLS paths, custom ZLS options, and automatic builds are ignored to prevent the workspace from configuring code execution.",
+      "restrictedConfigurations": [
+        "zig.path",
+        "zig.version",
+        "zig.libPath",
+        "zig.buildOnSaveProvider",
+        "zig.buildOnSaveArgs",
+        "zig.zls.path",
+        "zig.zls.enabled",
+        "zig.zls.builtinPath",
+        "zig.zls.buildRunnerPath",
+        "zig.zls.globalCachePath",
+        "zig.zls.additionalOptions"
+      ]
+    }
+  },
+  "private": true,
+  "readme": "README.md",
   "repository": {
     "type": "git",
     "url": "https://codeberg.org/ziglang/vscode-zig"
@@ -21,7 +56,7 @@
     "workspaceContains:build.zig.zon",
     "workspaceContains:./.zigversion"
   ],
-  "main": "./out/extension",
+  "main": "./out/extension.js",
   "contributes": {
     "configurationDefaults": {
       "[zig]": {
@@ -446,13 +481,12 @@
     ]
   },
   "scripts": {
-    "vscode:prepublish": "npm run build-base -- --minify",
-    "build-base": "esbuild --bundle --external:vscode src/extension.ts --outdir=out --platform=node --target=node20 --format=cjs",
-    "build": "npm run build-base -- --sourcemap",
-    "watch": "npm run build-base -- --sourcemap --watch",
-    "test": "npm run compile && node ./node_modules/vscode/bin/test",
+    "vscode:prepublish": "node esbuild.mjs --production",
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
+    "package": "vsce package --baseImagesUrl https://codeberg.org/ziglang/vscode-zig/raw/branch/main",
     "format:check": "prettier --check .",
     "lint": "eslint"
   },
