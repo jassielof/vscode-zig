@@ -6,9 +6,22 @@
   "publisher": "ziglang",
   "icon": "images/zig-icon.png",
   "license": "MIT",
+  "keywords": [
+    "zig",
+    "zon",
+    "lsp",
+    "language-server"
+  ],
   "repository": {
     "type": "git",
     "url": "https://codeberg.org/ziglang/vscode-zig"
+  },
+  "qna": "https://ziglang.org/community/",
+  "bugs": {
+    "url": "https://codeberg.org/ziglang/vscode-zig/issues"
+  },
+  "sponsor": {
+    "url": "https://ziglang.org/zsf/"
   },
   "engines": {
     "vscode": "^1.101.0"
@@ -455,11 +468,11 @@
     "build-base": "esbuild --bundle --external:vscode src/extension.ts --outdir=out --platform=node --target=node22 --format=cjs",
     "build": "npm run build-base -- --sourcemap",
     "watch": "npm run build-base -- --sourcemap --watch",
-    "test": "npm run compile && node ./node_modules/vscode/bin/test",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "lint": "eslint"
+    "lint": "eslint",
+    "package": "vsce package --baseContentUrl https://codeberg.org/ziglang/vscode-zig"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
