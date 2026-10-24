@@ -1,3 +1,11 @@
+## 0.7.0
+- Add command to insert line break without continuation on doc comments and multi-line string literals (@emilia)
+- Add command to create projects (@emilia)
+- Add build steps picker command (@emilia)
+- Allow tilde to denote home directory in all string options (@Techatrix)
+- Improve responsiveness of the select and install quickpick (@Techatrix)
+- Add zig.uninstall command
+
 ## 0.6.19
 - Add UI notifications for version retrieval behavior (@Verafahn)
 - Replace instead of appending `ZIG_LIB_DIR` environment variable (@Techatrix)
