@@ -11,6 +11,8 @@ import * as zigUtil from "./zigUtil";
 import { ZigProvider } from "./zigProvider";
 import { snakeCase } from "lodash-es";
 
+import * as zls from "./zls";
+
 let statusItem: vscode.StatusBarItem;
 let languageStatusItem: vscode.LanguageStatusItem;
 let versionManagerConfig: versionManager.Config;
@@ -435,6 +437,45 @@ async function showUpdateWorkspaceVersionDialog(
             break;
         }
     }
+}
+
+async function selectAndUninstall(context: vscode.ExtensionContext) {
+    const items: QuickPickItem[] = [];
+
+    async function addUninstalls(name: string, config: versionManager.Config) {
+        for (const version of await versionManager.query(config)) {
+            items.push({
+                label: `${name} ${version.toString()}`,
+                onDidAccept: async () => {
+                    try {
+                        await versionManager.uninstall(config, version);
+                    } catch (err) {
+                        if (err instanceof Error) {
+                            void vscode.window.showErrorMessage(
+                                `Failed to uninstall ${name} ${version.toString()}: ${err.message}`,
+                            );
+                        } else {
+                            void vscode.window.showErrorMessage(`Failed to uninstall ${name} ${version.toString()}`);
+                        }
+                    }
+                },
+            });
+        }
+    }
+    await addUninstalls("Zig", versionManagerConfig);
+    await addUninstalls("ZLS", zls.versionManagerConfig);
+
+    const selection = await vscode.window.showQuickPick(items, {
+        title: "Uninstall",
+        placeHolder: "Select installations to remove",
+        canPickMany: true,
+    });
+    if (!selection) return;
+    for (const item of selection) {
+        if (!item.onDidAccept) continue;
+        void item.onDidAccept();
+    }
+    await updateStatus(context);
 }
 
 interface BuildZigZonMetadata {
@@ -865,6 +906,9 @@ export async function setupZig(context: vscode.ExtensionContext) {
         languageStatusItem,
         vscode.commands.registerCommand("zig.install", async () => {
             await selectVersionAndInstall(context);
+        }),
+        vscode.commands.registerCommand("zig.uninstall", async () => {
+            await selectAndUninstall(context);
         }),
         vscode.workspace.onDidChangeConfiguration((change) => {
             if (change.affectsConfiguration("zig.version")) {
